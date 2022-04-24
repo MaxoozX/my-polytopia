@@ -8,13 +8,17 @@
 #ifndef BLOCK_H
 #define BLOCK_H
 
+#include <vector>
+
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 
 #include "Engine/Geometry.hpp"
 #include "Engine/Color.hpp"
 #include "Engine/Sprite.hpp"
 
 #include "Shape.hpp"
+#include "constants.hpp"
 
 class Block : public Sprite {
     
@@ -24,6 +28,8 @@ class Block : public Sprite {
         int m_windowHeight;
 
         Shape m_shape;
+
+        std::vector<SDL_Texture*>* m_faceTextures;
 
     public:
         int m_shapeIndex;
@@ -36,9 +42,11 @@ class Block : public Sprite {
 
         Color m_color;
 
-        Block(SDL_Renderer* = nullptr, int = 0, int = 0, int = 0, int = 0, int = 2 );
+        Constants* constants;
+
+        Block(SDL_Renderer* = nullptr, int = 0, int = 0, int = 0, int = 0, int = 2, std::vector<SDL_Texture*>* = nullptr, Constants* = nullptr);
         void load();
-        void draw(int = 0, int = 0) const;
+        void draw(int = 0, int = 0, bool = false) const;
         void rotate();
         void rotateBack();
 

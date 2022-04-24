@@ -24,7 +24,6 @@ Game::Game(int windowWidth, int windowHeight, int frameRate):   window(nullptr),
 void Game::setup() {
     setupSDL();
     ready = true;
-    SDL_Log("The game is ready");
 }
 
 void Game::start() {
@@ -56,8 +55,6 @@ void Game::mainLoop() {
 
         timeElapsed = SDL_GetTicks() - lastTime; // In ms
         timeToWait = timePerFrame - timeElapsed;
-
-        // SDL_Log("wait time : %d", timeToWait);
 
         if (timeToWait > 0) {
             SDL_Delay(timeToWait);

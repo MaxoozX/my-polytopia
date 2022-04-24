@@ -21,15 +21,19 @@ int main(int argc, char **argv) {
 
   SDL_Init(SDL_INIT_EVERYTHING);
 
+  Constants* constants = new Constants();
+
+  constants->setup();
 
   Tetris game(
-    constants::WIDTH_IN_PIXELS,
-    constants::HEIGHT_IN_PIXELS,
-    constants::FRAMERATE,
-    constants::NUMBER_SHAPES,
-    constants::BOARD_OFFSET_X,
-    constants::BOARD_OFFSET_Y
-    ); // TODO: Add a scaling factor for window size
+    constants->WIDTH_IN_PIXELS,
+    constants->HEIGHT_IN_PIXELS,
+    constants->FRAMERATE,
+    constants->NUMBER_SHAPES,
+    constants->BOARD_OFFSET_X,
+    constants->BOARD_OFFSET_Y,
+    constants
+    );
   game.setup();
   game.start();
   game.destroy();

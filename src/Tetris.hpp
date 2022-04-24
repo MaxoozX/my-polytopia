@@ -19,6 +19,7 @@
 #include "Engine/Color.hpp"
 
 #include "Block.hpp"
+#include "constants.hpp"
 
 class Tetris : public Game {
     private:
@@ -48,6 +49,7 @@ class Tetris : public Game {
         int score;
 
         std::vector<SDL_Texture*> digitsTextures;
+        std::vector<SDL_Texture*> faceTextures;
         SDL_Texture* backgroundTheme;
         SDL_Texture* gameoverOverlay;
 
@@ -55,8 +57,13 @@ class Tetris : public Game {
         int m_boardOffsetX;
         int m_boardOffsetY;
 
+        bool displayFaces;
+
+        Constants* constants;
+
         void loadBackgroundTextures();
         void loadDigitsTextures();
+        void loadFaceTextures();
 
         void handleInput(const SDL_Event&);
 
@@ -72,7 +79,7 @@ class Tetris : public Game {
         void gameover();
 
     public:
-        Tetris(int = 0, int = 0, int = 30, int = 1, int = 0, int = 0);
+        Tetris(int = 0, int = 0, int = 30, int = 1, int = 0, int = 0, Constants* = nullptr);
         void setup();
         void update();
         void replay();

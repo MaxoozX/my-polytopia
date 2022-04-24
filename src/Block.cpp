@@ -5,6 +5,8 @@
  * @version 1.0
 */
 
+#include <cstdlib>
+
 #include <fstream>
 #include <tuple>
 #include <filesystem>
@@ -24,46 +26,42 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 
-Block::Block(SDL_Renderer* renderer, int windowWidth, int windowHeight, int x, int y, int shapeIndex):
+Block::Block(SDL_Renderer* renderer, int windowWidth, int windowHeight, int x, int y, int shapeIndex, std::vector<SDL_Texture*> *faceTextures, Constants* ptrConstants):
     Sprite::Sprite(x, y, 0, 0, renderer, 10),
     m_shapeIndex(shapeIndex), m_x(x), m_y(y),
     m_trueLeft(0), m_trueRight(0), m_trueBottom(0),
-    m_rotation(0), m_color(0, 0, 0, 1.0)
+    m_rotation(0), m_color(0, 0, 0, 1.0),
+    m_faceTextures(faceTextures), constants(ptrConstants)
     {}
 
 void Block::load() {
 
     std::filesystem::path shapePath;
 
-    switch(m_shapeIndex) {
-        case constants::PIECE_I: // light blue
-            shapePath = constants::assetsPath / "1";
-            m_color = Color(0, 255, 255, 1.0);
-            break;
-        case constants::PIECE_O: // yellow
-            shapePath = constants::assetsPath / "2";
-            m_color = Color(255, 215, 0, 1.0);
-            break;
-        case constants::PIECE_Z: // red
-            shapePath = constants::assetsPath / "3";
-            m_color = Color(220, 20, 60, 1.0);
-            break;
-        case constants::PIECE_S: // green
-            shapePath = constants::assetsPath / "4";
-            m_color = Color(50, 205, 50, 1.0);
-            break;
-        case constants::PIECE_J: // blue
-            shapePath = constants::assetsPath / "5";
-            m_color = Color(0, 0, 205, 1.0);
-            break;
-        case constants::PIECE_L: // orange
-            shapePath = constants::assetsPath / "6";
-            m_color = Color(255, 140, 0, 1.0);
-            break;
-        case constants::PIECE_T: // pink
-            shapePath = constants::assetsPath / "7";
-            m_color = Color(255, 105, 180, 1.0);
-            break;
+    if (m_shapeIndex == constants->PIECE_I) {
+        shapePath = constants->assetsPath / "1";
+        m_color = Color(0, 255, 255, 1.0);
+    } else if (m_shapeIndex == constants->PIECE_O) {
+        shapePath = constants->assetsPath / "2";
+        m_color = Color(255, 215, 0, 1.0);
+    } else if (m_shapeIndex == constants->PIECE_Z) {
+        shapePath = constants->assetsPath / "3";
+        m_color = Color(220, 20, 60, 1.0);
+    } else if (m_shapeIndex == constants->PIECE_S) {
+        shapePath = constants->assetsPath / "4";
+        m_color = Color(50, 205, 50, 1.0);
+    } else if (m_shapeIndex == constants->PIECE_J) {
+        shapePath = constants->assetsPath / "5";
+        m_color = Color(0, 0, 205, 1.0);
+    } else if (m_shapeIndex == constants->PIECE_L) {
+        shapePath = constants->assetsPath / "6";
+        m_color = Color(255, 140, 0, 1.0);
+    } else if (m_shapeIndex == constants->PIECE_T) {
+        shapePath = constants->assetsPath / "7";
+        m_color = Color(255, 105, 180, 1.0);
+    } else {
+        SDL_Log("Can't match the shape %d with a known shape", m_shapeIndex);
+        throw std::runtime_error("Shape path isn't defined because the shape can't be found");
     }
     
     const std::filesystem::path texturePath = shapePath / "shape.png";
@@ -98,10 +96,16 @@ void Block::load() {
 
 }
 
-void Block::draw(int offsetX, int offsetY) const {
+void Block::draw(int offsetX, int offsetY, bool preventFaces) const {
+
+    // TODO: New rect for the face selection
+
+    SDL_Rect faceRect;
+    faceRect.w = constants->CELL_WIDTH_FOR_FACES;
+    faceRect.h = constants->CELL_WIDTH_FOR_FACES;
 
     SDL_Rect rect;
-    rect.w = constants::CELL_SIZE - constants::BORDER_SIZE;
+    rect.w = constants->CELL_SIZE - constants->BORDER_SIZE;
     rect.h = rect.w;
 
     m_color.setRendererDrawColor(m_renderer);
@@ -110,11 +114,29 @@ void Block::draw(int offsetX, int offsetY) const {
         for(int column = 0; column < m_shape.m_width; column++) {
 
             if(m_shape.grid[row][column] != 0) {
-            
-                rect.x = (m_x + column) * constants::CELL_SIZE + offsetX;
-                rect.y = (m_y + row) * constants::CELL_SIZE + offsetY;
 
-                SDL_RenderFillRect(m_renderer, &rect);
+                int actualX = (m_x + column);
+                int actualY = (m_y + row);
+            
+                rect.x = actualX * constants->CELL_SIZE + offsetX;
+                rect.y = actualY * constants->CELL_SIZE + offsetY;
+
+                std::div_t faceCol = div(actualX, 5);
+                std::div_t faceRow = div(actualY, 5);
+
+                faceRect.x = faceCol.rem * constants->CELL_WIDTH_FOR_FACES;
+                faceRect.y = faceRow.rem * constants->CELL_WIDTH_FOR_FACES;
+
+                int faceIndex = faceRow.quot;
+
+                if(faceCol.quot >= 1) faceIndex += 5;
+
+                if(faceRow.quot >= 0 && !preventFaces) {
+                    SDL_RenderCopy(m_renderer, (*m_faceTextures)[faceIndex], &faceRect, &rect);
+                } else {
+                    SDL_RenderFillRect(m_renderer, &rect);
+                }
+                
 
             }
         }

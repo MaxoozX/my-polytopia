@@ -11,11 +11,13 @@
 #include <utility>
 #include <string>
 #include <filesystem>
+#include <fstream>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
 #include "Engine/Game.hpp"
+#include "Engine/json.hpp"
 
 #include "constants.hpp"
 #include "exceptions.hpp"
@@ -25,30 +27,49 @@
 
 using blocksIterator = std::vector< Block* >::iterator;
 
-Tetris::Tetris(int windowWidth, int windowHeight, int frameRate, int maxBlockIndex, int boardOffsetX, int boardOffsetY): 
+using json = nlohmann::json;
+namespace fs = std::filesystem;
+
+Tetris::Tetris(int windowWidth, int windowHeight, int frameRate, int maxBlockIndex, int boardOffsetX, int boardOffsetY, Constants* ptrConstants): 
     Game::Game(windowWidth, windowHeight, frameRate),
     m_currentBlock(nullptr), m_nextBlock(nullptr), m_blocks(),
     blockChoice(1, maxBlockIndex), possibleShapes(),
     spaceBarPressed(false), leftArrowPressed(false), rightArrowPressed(false), bottomArrowPressed(false),
     lastMove(0), lastDownMove(0),
-    widthCells(constants::WIDTH_IN_CELLS), heightCells(constants::HEIGHT_IN_CELLS),
-    tilesPerLines(constants::HEIGHT_IN_CELLS, 0),
+    widthCells(ptrConstants->WIDTH_IN_CELLS), heightCells(ptrConstants->HEIGHT_IN_CELLS),
+    tilesPerLines(ptrConstants->HEIGHT_IN_CELLS, 0),
     score(0), digitsTextures(10, nullptr), backgroundTheme(nullptr),
-    backgroundColor(0,0,0,1.0), m_boardOffsetX(boardOffsetX), m_boardOffsetY(boardOffsetY)
-    {
-        SDL_Log("CWD : %s", constants::CWD.string().c_str());
-    }
+    faceTextures(10, nullptr),
+    backgroundColor(0,0,0,1.0), m_boardOffsetX(boardOffsetX), m_boardOffsetY(boardOffsetY),
+    displayFaces(false), constants(ptrConstants)
+    {}
 
 void Tetris::setup() {
 
     Game::setup();
 
-    // SDL_RenderSetLogicalSize(m_renderer, 2*gameWindowWidth, 2*gameWindowHeight);
+    // Read the value of faces
+    const std::filesystem::path configPath = constants->assetsPath / "config.json";
+    if(!fs::exists(configPath)) {
+        SDL_Log("Impossible to find the configuration file at %s", configPath.string().c_str());
+        throw std::runtime_error("Impossible to load data file");
+    }
+
+    // Read JSON file
+    std::ifstream file(configPath);
+    json data;
+    file >> data;
+
+    displayFaces = data["faces"].get<bool>();
 
     loadDigitsTextures();
     loadBackgroundTextures();
+    loadFaceTextures();
 
     m_currentBlock = newBlock();
+
+    SDL_Log("This game is provided by Maxooz");
+    SDL_Log("The game is ready.");
 
 }
 
@@ -63,7 +84,7 @@ void Tetris::replay() {
     possibleShapes.clear();
     spaceBarPressed = false, leftArrowPressed = false, rightArrowPressed = false, bottomArrowPressed = false;
     lastMove = 0, lastDownMove = 0;
-    tilesPerLines = std::vector<int>(constants::HEIGHT_IN_CELLS, 0);
+    tilesPerLines = std::vector<int>(constants->HEIGHT_IN_CELLS, 0);
     score = 0;
 
     m_currentBlock = newBlock();
@@ -115,8 +136,31 @@ void Tetris::gameover() {
         }
 
     }
-    SDL_Log("Loop ended");
+    // SDL_Log("Loop ended");
     if(wannaReplay) replay();
+
+}
+
+void Tetris::loadFaceTextures() {
+
+    const std::filesystem::path facesPath = constants->assetsPath / "background";
+
+    // Should load from 0 to 9
+
+    for(int i = 0; i < 10; i++) {
+
+        const std::filesystem::path facePath = facesPath / (std::to_string(i) + ".png");
+        if(!std::filesystem::exists(facePath)) {
+            SDL_Log("The face file : %s doesn't exist.", facePath.string().c_str());
+        }
+
+        faceTextures[i] = IMG_LoadTexture(m_renderer, facePath.string().c_str());
+
+        if(faceTextures[i] == nullptr) {
+            SDL_Log("Problem loading the face : %d (%s)", i, IMG_GetError());
+        }
+
+    }
 
 }
 
@@ -124,7 +168,7 @@ void Tetris::loadBackgroundTextures() {
 
     // backgroundTheme
 
-    const std::filesystem::path backgroundThemePath = constants::assetsPath / "backgroundTheme.png";
+    const std::filesystem::path backgroundThemePath = constants->assetsPath / "backgroundTheme.png";
     const std::string backgroundThemePathString = backgroundThemePath.string();
     const char* backgroundThemePathCStr = backgroundThemePathString.c_str();
 
@@ -133,7 +177,7 @@ void Tetris::loadBackgroundTextures() {
         SDL_Log("Problem loading the background theme (%s)", IMG_GetError());
     }
 
-    const std::filesystem::path gameoverOverlayPath = constants::assetsPath / "gameoverOverlay.png";
+    const std::filesystem::path gameoverOverlayPath = constants->assetsPath / "gameoverOverlay.png";
     const std::string gameoverOverlayPathString = gameoverOverlayPath.string();
     const char* gameoverOverlayPathCStr = gameoverOverlayPathString.c_str();
 
@@ -146,7 +190,7 @@ void Tetris::loadBackgroundTextures() {
 
 void Tetris::loadDigitsTextures() {
 
-    const std::filesystem::path digitsPath = constants::assetsPath / "digits";    
+    const std::filesystem::path digitsPath = constants->assetsPath / "digits";    
 
     for(int i = 0; i < 10; i++) {
 
@@ -158,7 +202,7 @@ void Tetris::loadDigitsTextures() {
         if(digitsTextures[i] == nullptr) {
             SDL_Log("Problem loading the texture of the number %d (%s)", i, IMG_GetError());
         }
-        SDL_SetTextureColorMod(digitsTextures[i], 255, 255, 255); // FIXME: Not working
+        SDL_SetTextureColorMod(digitsTextures[i], 255, 255, 255);
     }
 }
 
@@ -183,13 +227,13 @@ Block* Tetris::newBlock() {
     // newBlock -> nextBlock
     // nextBlock -> currentBlock
     if(m_nextBlock == nullptr) {
-        m_nextBlock = new Block(m_renderer, widthCells, heightCells, 3, 5, blockChoice(mt));
+        m_nextBlock = new Block(m_renderer, widthCells, heightCells, 3, 5, blockChoice(mt), &faceTextures, constants);
         m_nextBlock->load();
     }
 
     Block* newBlock = m_nextBlock;
 
-    m_nextBlock = new Block(m_renderer, widthCells, heightCells, 3, 5, shapeIndex);
+    m_nextBlock = new Block(m_renderer, widthCells, heightCells, 3, 5, shapeIndex, &faceTextures, constants);
     
     m_nextBlock->load();
 
@@ -215,10 +259,10 @@ void Tetris::update() {
 
     double difficulyFactor = pow(0.93, log2(score>0?(float)score:1.0f));
 
-    bool playerCanMove = (currentTime - lastMove) > (1000 / constants::MOVES_SECOND);
+    bool playerCanMove = (currentTime - lastMove) > (1000 / constants->MOVES_SECOND);
     bool pieceShouldMoveDown = (bottomArrowPressed)
-        ? (currentTime - lastDownMove) > (1000 / constants::DOWN_MOVES_SECOND * difficulyFactor) / 4
-        : (currentTime - lastDownMove) > (1000 / constants::DOWN_MOVES_SECOND * difficulyFactor);
+        ? (currentTime - lastDownMove) > (1000 / constants->DOWN_MOVES_SECOND * difficulyFactor) / 4
+        : (currentTime - lastDownMove) > (1000 / constants->DOWN_MOVES_SECOND * difficulyFactor);
 
     if(playerCanMove) {
         moveCurrentBlockSide();
@@ -243,7 +287,7 @@ void Tetris::update() {
             int row = m_currentBlock->m_y + m_currentBlock->m_trueBottom; // Starts at the end to prevent undefined shape behavior
             row >= minRowToCheck;
         ) {
-            SDL_Log("Lines [%d] : %d", row, tilesPerLines[row]);
+            // SDL_Log("Lines [%d] : %d", row, tilesPerLines[row]);
             if(row < heightCells && tilesPerLines[row] >= widthCells) {
                 linesCompleted++;
                 // SDL_Log("Removing row : %d", row);
@@ -328,22 +372,22 @@ void Tetris::display() {
 
 
     for(Block* loopCurBlock : m_blocks) {
-        loopCurBlock->draw(m_boardOffsetX, m_boardOffsetY);
+        loopCurBlock->draw(m_boardOffsetX, m_boardOffsetY, !displayFaces);
     }
-    m_currentBlock->draw(m_boardOffsetX, m_boardOffsetY);
-    m_nextBlock->draw();
+    m_currentBlock->draw(m_boardOffsetX, m_boardOffsetY, !displayFaces);
+    m_nextBlock->draw(0, 0, true);
 
 
     std::string scoreStr = std::to_string(score);
     int nbDigits = scoreStr.length();
 
     SDL_Rect digitRect;
-    digitRect.h = constants::DIGIT_H;
-    digitRect.w = constants::DIGIT_W;
-    digitRect.x = constants::DIGIT_X0;
-    digitRect.y = constants::DIGIT_Y0;
+    digitRect.h = constants->DIGIT_H;
+    digitRect.w = constants->DIGIT_W;
+    digitRect.x = constants->DIGIT_X0;
+    digitRect.y = constants->DIGIT_Y0;
 
-    for(int index = 0; index < nbDigits; index++, digitRect.x += constants::DIGIT_OFFSET) {
+    for(int index = 0; index < nbDigits; index++, digitRect.x += constants->DIGIT_OFFSET) {
 
         char curChar = scoreStr[index];
         int actualNumber = curChar - 48;
@@ -356,11 +400,11 @@ void Tetris::display() {
 
 bool Tetris::rotateCurrentBlock() {
 
-    if(m_currentBlock->m_shapeIndex == constants::PIECE_O) {
+    if(m_currentBlock->m_shapeIndex == constants->PIECE_O) {
 
         return true;
 
-    } else if(m_currentBlock->m_shapeIndex == constants::PIECE_I) {
+    } else if(m_currentBlock->m_shapeIndex == constants->PIECE_I) {
 
         // Special rotation R
         int index = m_currentBlock->m_rotation;
@@ -370,8 +414,8 @@ bool Tetris::rotateCurrentBlock() {
         for(int i = 0; i < 4; i++) {
 
             int x, y;
-            x = constants::WALLKICK_I_R[index][i][0];
-            y = constants::WALLKICK_I_R[index][i][1];
+            x = constants->WALLKICK_I_R[index][i][0];
+            y = constants->WALLKICK_I_R[index][i][1];
 
             // SDL_Log("trying rotation %d : (%d, %d)", i, x, y);
 
@@ -398,8 +442,8 @@ bool Tetris::rotateCurrentBlock() {
         for(int i = 0; i < 4; i++) {
 
             int x, y;
-            x = constants::WALLKICK_NORMAL_R[index][i][0];
-            y = constants::WALLKICK_NORMAL_R[index][i][1];
+            x = constants->WALLKICK_NORMAL_R[index][i][0];
+            y = constants->WALLKICK_NORMAL_R[index][i][1];
 
             // SDL_Log("trying rotation %d : (%d, %d)", i, x, y);
 
@@ -558,6 +602,10 @@ void Tetris::handleInput(const SDL_Event &event) {
 
                     case SDLK_DOWN:
                         bottomArrowPressed = true;
+                        break;
+
+                    case SDLK_f:
+                        displayFaces = (!displayFaces); // Switch the display faces
                         break;
 
                     default:
