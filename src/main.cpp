@@ -9,40 +9,22 @@
 #include <algorithm>
 
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h> // To load the texture (IMG_...)
+#include <SDL2/SDL_image.h>
 
-#include "Tetris.hpp"
-
-#include "constants.hpp"
-
-using namespace std;
+#include "MyGame.hpp"
 
 int main(int argc, char **argv) {
 
-  SDL_Init(SDL_INIT_EVERYTHING);
+    SDL_Init(SDL_INIT_EVERYTHING);
 
-  Constants* constants = new Constants();
+    MyGame myGame(1200, 900, 144, 50);
 
-  constants->setup();
+    myGame.setup();
 
-  Tetris game(
-    constants->WIDTH_IN_PIXELS,
-    constants->HEIGHT_IN_PIXELS,
-    constants->FRAMERATE,
-    constants->NUMBER_SHAPES,
-    constants->BOARD_OFFSET_X,
-    constants->BOARD_OFFSET_Y,
-    constants
-    );
-  game.setup();
-  game.start();
-  game.destroy();
+    myGame.start();
 
-  return 0;
+    myGame.destroy();
+
+    return 0;
+
 }
-
-/*
-- Add a score counter
-- Add some sort of super attack
-- Add sounds with SDL_Mixer
-*/

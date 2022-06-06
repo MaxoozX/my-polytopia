@@ -18,7 +18,7 @@ Game::Game(int windowWidth, int windowHeight, int frameRate):   window(nullptr),
                                                                 gameFrameRate(frameRate), timePerFrame(1000 / frameRate),
                                                                 lastTime(0), timeElapsed(0), timeToWait(0),
 
-                                                                mt(std::time(nullptr)), dist(0, 1000)
+                                                                m_randomRange(std::time(nullptr)), dist(0, 1000)
                                                                 {}
 
 void Game::setup() {

@@ -1,4 +1,74 @@
 {
-    "faces": false,
-    "scale": "1.6"
+    "scale": "1.6",
+    "window": {
+        "width": 1200,
+        "height": 900
+    },
+    "textures": {
+        "land": {
+            "width": 120,
+            "height": 120,
+            "path": "square-cube.png",
+            "alpha": "1"
+        },
+        "sand": {
+            "width": 120,
+            "height": 120,
+            "path": "sand.png",
+            "alpha": "1"
+        },
+        "water": {
+            "full": {
+                "width": 120,
+                "height": 120,
+                "path": "water.png",
+                "alpha": "0.6"
+            },
+            "top": {
+                "width": 120,
+                "height": 120,
+                "path": "water-top.png",
+                "alpha": "0.6"
+            },
+            "left": {
+                "width": 120,
+                "height": 120,
+                "path": "water-top-left.png",
+                "alpha": "0.6"
+            },
+            "right": {
+                "width": 120,
+                "height": 120,
+                "path": "water-top-right.png",
+                "alpha": "0.6"
+            }
+        },
+        "tree": {
+            "width": 120,
+            "height": 240,
+            "path": "one-tree.png",
+            "alpha": "1"
+        },
+        "forest": {
+            "width": 120,
+            "height": 240,
+            "path": "forest.png",
+            "alpha": "1"
+        },
+        "sand-forest": {
+            "width": 120,
+            "height": 240,
+            "path": "sand-forest.png",
+            "alpha": "1"
+        },
+        "undefined": {
+            "width": 120,
+            "height": 240,
+            "path": "undefined.png",
+            "alpha": "1"
+        }
+    },
+    "generation": {
+        "constraints": {}
+    }
 }

@@ -33,7 +33,8 @@ class Game {
         int timeElapsed;
         int timeToWait;
 
-        std::mt19937 mt;
+        std::random_device dev;
+        std::mt19937 m_randomRange;
         std::uniform_int_distribution<int> dist;
 
         void setupSDL();
