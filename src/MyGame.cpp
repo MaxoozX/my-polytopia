@@ -21,7 +21,7 @@
 #include "Engine/Geometry.hpp"
 #include "Engine/json.hpp"
 
-#include "TileTexture.hpp"
+#include "SpriteTexture.hpp"
 #include "Tile.hpp"
 #include "Biomes.hpp"
 
@@ -49,9 +49,11 @@ T max(T a, T b) {
 
 MyGame::MyGame(int windowWidth, int windowHeight, int framerate, int gridSize):
     Game::Game(windowWidth, windowHeight, framerate),
-    camera(121*gridSize/2, 70*gridSize/2, windowWidth, windowHeight, windowWidth, windowHeight, -100, 121*gridSize, -200, 69*gridSize, 1.0),
+    camera(0, 0, windowWidth, windowHeight, windowWidth, windowHeight, -100, 121*gridSize, -200, 69*gridSize, 1.0),
+    player(0, 0, NULL), // TODO: Random spawn location and set texture
     gridWidth(gridSize), gridHeight(gridSize),
-    showSelectedTile(false),
+    showSelectedTile(false), isZoomingIn(false), isZoomingOut(false),
+    leftClickPress(false),
     grid(gridSize, std::vector<Tile>(gridSize, Tile()))
 {
     generationConstraints = { // TODO: Add coefficients that change the probability of getting each element
@@ -64,6 +66,8 @@ MyGame::MyGame(int windowWidth, int windowHeight, int framerate, int gridSize):
             {Biomes::Sand, 1},
             {Biomes::Water, 1},
             {Biomes::SandForest, 1},
+            {Biomes::LavaFloor, 1},
+            // {Biomes::Volcano, 1},
         }},
         {Biomes::Land, {
             {Biomes::Tree, 1},
@@ -84,26 +88,58 @@ MyGame::MyGame(int windowWidth, int windowHeight, int framerate, int gridSize):
             {Biomes::SandForest, 1},
             {Biomes::Sand, 1},
             {Biomes::Forest, 1},
+        }},
+        {Biomes::LavaFloor, {
+            {Biomes::Volcano, 1},
+            {Biomes::Sand, 1},
+            {Biomes::LavaFloor, 1},
+        }},
+        {Biomes::Volcano, {
+            {Biomes::LavaFloor, 1},
+            // {Biomes::Sand, 1},
         }}
     };
 
-    generationPriorities = { // TODO: Add coefficients that change the probability of getting each element
+    // If I want to change the terrain structure, it's here
+    generationPriorities = { // TODO: I would have liked to change the probability depending on the neighbours
         // {Biomes::Water, 3},
         // {Biomes::Sand, 2},
-        // {Biomes::Land, 5},
-        // {Biomes::Tree, 2},
-        // {Biomes::Forest, 2},
-        // {Biomes::SandForest, 1}
-        {Biomes::Water, 1},
-        {Biomes::Sand, 1},
+        // {Biomes::Land, 2},
+        // {Biomes::Tree, 1},
+        // {Biomes::Forest, 1},
+        // {Biomes::SandForest, 1},
+        // {Biomes::LavaFloor, 1},
+        // {Biomes::Volcano, 1},
+        {Biomes::Water, 0},
+        {Biomes::Sand, 0},
         {Biomes::Land, 1},
-        {Biomes::Tree, 1},
-        {Biomes::Forest, 1},
-        {Biomes::SandForest, 1}
+        {Biomes::Tree, 0},
+        {Biomes::Forest, 0},
+        {Biomes::SandForest, 0},
+        {Biomes::LavaFloor, 0},
+        {Biomes::Volcano, 0},
     };
+
+    tilemapCurrentTexture = nullptr;
+
 }
 
-TileTexture MyGame::loadTextureFromJson(nlohmann::json textureJson, std::string textureIdentifier) {
+template<class T>
+std::map<Biomes, T> MyGame::getBiomesMapDefaultVal(const T defaultValue) const {
+    std::map<Biomes, T> newMap = {
+        {Biomes::Water, defaultValue},
+        {Biomes::Sand, defaultValue},
+        {Biomes::Land, defaultValue},
+        {Biomes::Tree, defaultValue},
+        {Biomes::Forest, defaultValue},
+        {Biomes::SandForest, defaultValue},
+        {Biomes::LavaFloor, defaultValue},
+        {Biomes::Volcano, defaultValue}
+    };
+    return newMap;
+}
+
+SpriteTexture MyGame::loadTextureFromJson(nlohmann::json textureJson, std::string textureIdentifier) {
 
     std::string textureName = textureJson["path"].get<std::string>();
     std::string texturePath = std::string("../assets/") + textureName;
@@ -113,15 +149,15 @@ TileTexture MyGame::loadTextureFromJson(nlohmann::json textureJson, std::string 
     double textureAlphaF = ::atof(textureAlphaStr.c_str());
     int textureAlpha = 255 * textureAlphaF;
 
-    TileTexture newTileTexture;
+    SpriteTexture newSpriteTexture;
 
     try {
-        newTileTexture = TileTexture(m_renderer, textureWidth, textureHeight, texturePath, textureAlpha);
+        newSpriteTexture = SpriteTexture(m_renderer, textureWidth, textureHeight, texturePath, textureAlpha);
     } catch (std::invalid_argument& e) {
         SDL_Log("Problem loading %s : %s", textureIdentifier.c_str(), e.what());
     }
 
-    return newTileTexture;
+    return newSpriteTexture;
 
 }
 
@@ -130,6 +166,7 @@ void MyGame::setup() {
     Game::setup();
 
     SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND); // Make sure our renderer can render transparency correctly
+    SDL_SetHint (SDL_HINT_RENDER_SCALE_QUALITY, "0"); // Make sure the textures are scaled properly    
 
     const std::filesystem::path configPath = "../assets/config.json";
 
@@ -169,8 +206,32 @@ void MyGame::setup() {
     json sandForestInfo = textures["sand-forest"].get<json>();
     sandForestTexture = loadTextureFromJson(sandForestInfo, "sandForestTexture");
 
+    json volcanoInfo = textures["volcano"].get<json>();
+    volcanoTexture = loadTextureFromJson(volcanoInfo, "volcanoTexture");
+
+    json lavaFloorInfo = textures["lava-floor"].get<json>();
+    lavaFloorTexture = loadTextureFromJson(lavaFloorInfo, "lavaFloorTexture");
+
     json undefinedInfo = textures["undefined"].get<json>();
     undefinedTexture = loadTextureFromJson(undefinedInfo, "undefinedTexture");
+
+    json selectionCircleInfo = textures["selection-circle"].get<json>();
+    selectionCircleTexture = loadTextureFromJson(selectionCircleInfo, "selectionCircleTexture");
+
+    json splayerInfo = textures["character1"].get<json>();
+    playerTexture = loadTextureFromJson(splayerInfo, "character1Texture");
+
+    player.texture = &playerTexture;
+
+    /*
+    To improve performances, we will render the map on this texture only when there is a change, this way, there is no need to render a lot of tiles on every frame.
+    */
+    tilemapCurrentTexture = SDL_CreateTexture( m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 121*gridWidth+100, 69*gridHeight+200 );
+    // FIXME: Hardcoded value, to change
+
+    if(tilemapCurrentTexture == nullptr) {
+        SDL_Log("There was a problem creating the tilemap texture : %s", SDL_GetError());
+    }
 
     generateWorld();
 
@@ -187,7 +248,7 @@ void MyGame::generateWorld() {
         gridHeight,
         std::vector< AllowedAdj >(
             gridWidth,
-            {{Biomes::Water, true},{Biomes::Sand, true},{Biomes::Land, true},{Biomes::Tree, true},{Biomes::Forest, true}, {Biomes::SandForest, true}}
+            getBiomesMapDefaultVal<bool>(true)
         )
     );
 
@@ -262,7 +323,7 @@ void MyGame::generateWorld() {
         grid[minY][minX].setBiome(chosenBiome);
 
         // Set the allowed biome
-        allowedBiomes[minY][minX] = {{Biomes::Water, false},{Biomes::Sand, false},{Biomes::Land, false},{Biomes::Tree, false},{Biomes::Forest, false},{Biomes::SandForest, false}};
+        allowedBiomes[minY][minX] = getBiomesMapDefaultVal<bool>(false);
         allowedBiomes[minY][minX][chosenBiome] = true;
 
         Point2d<int> nextToCollapse = Point2d(minX, minY);
@@ -277,7 +338,7 @@ void MyGame::generateWorld() {
             // Find the biomes forbidden for the neighbours because of the new selected biome
             // ------------------------------------------------------------------------------
 
-            AllowedAdj adjTilesAllowedBiomes = {{Biomes::Water, false},{Biomes::Sand, false},{Biomes::Land, false},{Biomes::Tree, false},{Biomes::Forest, false},{Biomes::SandForest, false}};
+            AllowedAdj adjTilesAllowedBiomes = getBiomesMapDefaultVal<bool>(false);
 
             for(AllowedAdj::iterator it = allowedBiomes[curComputing.y][curComputing.x].begin(); it != allowedBiomes[curComputing.y][curComputing.x].end(); ++it)
             {
@@ -383,6 +444,7 @@ void MyGame::generateWorld() {
     // Give every tile a texture
     mapTexturesToBiomes();
     
+    updateTilemapTexture();
 
 }
 
@@ -408,8 +470,16 @@ void MyGame::mapTexturesToBiomes() {
                     break;
 
                 case Biomes::SandForest:
-                        grid[col][row].setTexturePtr(&sandForestTexture);
-                        break;
+                    grid[col][row].setTexturePtr(&sandForestTexture);
+                    break;
+
+                case Biomes::LavaFloor:
+                    grid[col][row].setTexturePtr(&lavaFloorTexture);
+                    break;
+
+                case Biomes::Volcano:
+                    grid[col][row].setTexturePtr(&volcanoTexture);
+                    break;
 
                 case Biomes::Water:
                     grid[col][row].setTexturePtr(&waterTopTexture);
@@ -435,62 +505,86 @@ void MyGame::mapTexturesToBiomes() {
     }
 }
 
+void MyGame::handleZoom() {
+
+    const double zoomVal = 1.0 / gameFrameRate; // FIXME: Hardcoded, shouldn't be
+
+    if(isZoomingIn) {
+        camera.setZoom(camera.zoom + zoomVal);
+    }
+    if(isZoomingOut) {
+        camera.setZoom(camera.zoom - zoomVal);
+    }
+
+}
+
+
+void MyGame::handleCameraMovement() {
+
+    // const double speed = 1000 / camera.zoom / gameFrameRate; // FIXME: Hardcoded, shouldn't be
+    const double speed = std::round(500 / camera.zoom / gameFrameRate);
+
+    Point2d<int> mouseAbsPos; // The absolute position on the screen
+    Vector2d<int> windowTopLeftPos;
+
+    SDL_GetGlobalMouseState(&mouseAbsPos.x, &mouseAbsPos.y);
+
+    SDL_GetWindowPosition(window, &windowTopLeftPos.x, &windowTopLeftPos.y);
+
+    mouseAbsPos -= windowTopLeftPos;
+
+    // SDL_Log("%d %d", mouseAbsPos.x, mouseAbsPos.y);
+
+    if(mouseAbsPos.x > gameWindowWidth) {
+        camera.move(Vector2d<float>(speed, 0));
+        showSelectedTile = false;
+    }
+    if(mouseAbsPos.x < 0) {
+        camera.move(Vector2d<float>(-speed, 0));
+        showSelectedTile = false;
+    }
+    if(mouseAbsPos.y > gameWindowHeight) {
+        camera.move(Vector2d<float>(0, speed));
+        showSelectedTile = false;
+    }
+    if(mouseAbsPos.y < 0) {
+        camera.move(Vector2d<float>(0, -speed));
+        showSelectedTile = false;
+    }
+}
+
 void MyGame::update() {
 
     showSelectedTile = true;
 
-    const int speed = 20 / camera.zoom;
-
-    Point2d<int> mousePos; // The absolute position on the screen
-    Vector2d<int> windowTopLeftPos;
-
-    SDL_GetGlobalMouseState(&mousePos.x, &mousePos.y);
-
-    SDL_GetWindowPosition(window, &windowTopLeftPos.x, &windowTopLeftPos.y);
-
-    mousePos -= windowTopLeftPos;
-
-    // SDL_Log("%d %d", mousePos.x, mousePos.y);
-
-    if(mousePos.x > gameWindowWidth) {
-        camera.move(Vector2d<float>(speed, 0));
-        showSelectedTile = false;
-    }
-    if(mousePos.x < 0) {
-        camera.move(Vector2d<float>(-speed, 0));
-        showSelectedTile = false;
-    }
-    if(mousePos.y > gameWindowHeight) {
-        camera.move(Vector2d<float>(0, speed));
-        showSelectedTile = false;
-    }
-    if(mousePos.y < 0) {
-        camera.move(Vector2d<float>(0, -speed));
-        showSelectedTile = false;
-    }
-
-    // SDL_Log("%f %f", camera.x, camera.y);
+    handleZoom();
+    handleCameraMovement();
 
     display();
-
 }
 
-void MyGame::display() {
+void MyGame::updateTilemapTexture() {
 
-    // Set the background color to red
+    SDL_SetRenderTarget(m_renderer, tilemapCurrentTexture); // From now on we are drawing on the texture
+
+    if(SDL_GetRenderTarget(m_renderer) != tilemapCurrentTexture) { // Doesn't seem to be true
+        SDL_Log("The target has not been set and is still the window");
+        return;
+    }
+
+    // Set the background color to white
     SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
     SDL_RenderClear(m_renderer);
 
     // Draw the cubes
-    // TODO: Add these as constants
-    const int cubeWidth = 120;
+    const int cubeWidth = 120; // FIXME: Add these as constants
     const int cubeHeight = 120;
 
-    const int cubeWidthOffset = cubeWidth * TWO_THIRDS;
-    const int cubeHeightOffset = cubeHeight * HALF;
+    const int cubeWidthOffset = 120 * TWO_THIRDS; // FIXME: Hardcoded values, to change
+    const int cubeHeightOffset = 120 * HALF;
 
     const int startX =  camera.worldRight / 2; // 12200 / 2; //(gameWindowWidth) / 2;
-    const int startY = 0; // 150;
+    const int startY = 400;
 
     const double a = TWO_THIRDS * cubeWidthOffset;
     const double b = -TWO_THIRDS * cubeWidthOffset;
@@ -506,44 +600,126 @@ void MyGame::display() {
     cubeRect.x = 0;
     cubeRect.y = 0;
 
+    for(int col = 0; col < gridHeight; col++) {
+        for(int row = 0; row < gridWidth; row++) {
+
+            Tile* curTile = &(grid[col][row]);
+            SpriteTexture* curSpriteTexture = curTile->texture;
+
+            if(curTile->biome == Biomes::Undefined) continue;
+
+            int x = startX + (a * row + b * col);
+            // int y = startY + (c * row + d * col) + (int)((row + col) * 4);
+            int y = startY + (c * row + d * col);
+
+            cubeRect.w = curSpriteTexture->width;
+            cubeRect.h = curSpriteTexture->height;
+            cubeRect.x = x - curSpriteTexture->width / 2;
+            cubeRect.y = y - curSpriteTexture->height;
+
+            SDL_RenderCopy(m_renderer, curSpriteTexture->texture, nullptr, &cubeRect);
+            
+        }
+    }
+
+    // Display the player
+    int x = startX + (a * player.tileX + b * player.tileY);
+    int y = startY + (c * player.tileX + d * player.tileY);
+
+    cubeRect.w = player.texture->width;
+    cubeRect.h = player.texture->height;
+    cubeRect.x = x - player.texture->width / 2;
+    cubeRect.y = y - player.texture->height;
+
+    SDL_RenderCopy(m_renderer, player.texture->texture, nullptr, &cubeRect);
+
+    SDL_RenderPresent(m_renderer);
+    SDL_SetRenderTarget(m_renderer, NULL); // And we go back to drawing on the screen
+
+    // SDL_Log("The current render target : %p (the tilemap : %p)", (void*)SDL_GetRenderTarget(m_renderer), (void*)tilemapCurrentTexture);
+
+    // // Set the background color to white
+    // SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
+    // SDL_RenderClear(m_renderer);
+
+}
+
+void MyGame::display() {
+
+    // SDL_Log("The current render target : %p (the tilemap : %p)", (void*)SDL_GetRenderTarget(m_renderer), (void*)tilemapCurrentTexture);
+
+    SDL_Rect tilemapRect = {0, 0, gameWindowWidth, gameWindowHeight};
+
+    SDL_Rect tilemapInsideRect = {camera.x+100, camera.y+200, camera.w, camera.h}; // FIXME: Hardcoded values
+
+    // Set the background color to white
+    // SDL_SetRenderDrawColor(m_renderer, 255, 0, 255, 255);
+    // SDL_RenderClear(m_renderer);
+    
+    SDL_RenderCopy(m_renderer, tilemapCurrentTexture, &tilemapInsideRect, &tilemapRect);
+
+
+    // Find the player's mouse position
+    
+    // TODO: Add these as constants
+    const int cubeWidth = 120;
+    const int cubeHeight = 120;
+
+    const int cubeWidthOffset = cubeWidth * TWO_THIRDS;
+    const int cubeHeightOffset = cubeHeight * HALF;
+
+    const int startX =  camera.worldRight / 2; // 12200 / 2; //(gameWindowWidth) / 2;
+    const int startY = 400;
+
+    const double a = TWO_THIRDS * cubeWidthOffset;
+    const double b = -TWO_THIRDS * cubeWidthOffset;
+    const double c = HALF * cubeHeightOffset;
+    const double d = HALF * cubeHeightOffset;
+
+    SDL_Rect cubeRect;
+    cubeRect.w = cubeWidth;
+    cubeRect.h = cubeHeight;
+    cubeRect.x = 0;
+    cubeRect.y = 0;
+
     Point2d<int> mousePos;
 
     SDL_GetMouseState(&mousePos.x, &mousePos.y);
 
     mousePos = camera.getWorldCoordinates(mousePos);
 
+    mousePos += Vector2d(100, 200); // That is here because of the offset we apply on the tilemap texture
+
     int mouseScreenXafterOffset = mousePos.x - startX;
     int mouseScreenYafterOffset = mousePos.y - startY + cubeHeight;
 
-    int actualMouseX_ = (mouseScreenXafterOffset * d + mouseScreenYafterOffset * (-b)) / (a*d - b*c);
-    int actualMouseY_ = (mouseScreenXafterOffset * (-c) + mouseScreenYafterOffset * a) / (a*d - b*c);
+    // We use the inverse matrix to find the coordinates on the grid
+    int actualMouseX = (mouseScreenXafterOffset * d + mouseScreenYafterOffset * (-b)) / (a*d - b*c);
+    int actualMouseY = (mouseScreenXafterOffset * (-c) + mouseScreenYafterOffset * a) / (a*d - b*c);
 
-    int actualMouseX = max<int>(0,min<int>(gridWidth-1, actualMouseX_));
-    int actualMouseY = max<int>(0,min<int>(gridHeight-1, actualMouseY_));
+    // int actualMouseX = max<int>(0,min<int>(gridWidth-1, actualMouseX_));
+    // int actualMouseY = max<int>(0,min<int>(gridHeight-1, actualMouseY_));
 
     for(int col = 0; col < gridHeight; col++) {
         for(int row = 0; row < gridWidth; row++) {
-
-            Tile* curTile = &(grid[col][row]);
-            TileTexture* curTileTexture = curTile->texture;
-
-            if(curTile->biome == Biomes::Undefined) continue;
 
             int x = startX + (a * row + b * col);
             // int y = startY + (cubeHeight) * TWO_THIRDS * (i_hat[1] * row + j_hat[1] * col); // Cool downward going effect
             int y = startY + (c * row + d * col);
 
-            cubeRect.w = curTileTexture->width;
-            cubeRect.h = curTileTexture->height;
-            cubeRect.x = x - curTileTexture->width / 2;
-            cubeRect.y = y - curTileTexture->height;
+            cubeRect.w = selectionCircleTexture.width;
+            cubeRect.h = selectionCircleTexture.height;
+            cubeRect.x = x - selectionCircleTexture.width / 2 - 100; // These offsets are here for the same reason the vector2d a few lines up
+            cubeRect.y = y - selectionCircleTexture.height - 200;
 
-            if(curTile->biome != Biomes::Water && showSelectedTile && col == actualMouseY && row == actualMouseX) {
-                cubeRect.y -= 15;
-            }
-
-            if(camera.transformRect(&cubeRect)) {
-                SDL_RenderCopy(m_renderer, curTileTexture->texture, nullptr, &cubeRect);
+            if(col == actualMouseY && row == actualMouseX && camera.transformRect(&cubeRect)) {
+                SDL_RenderCopy(m_renderer, selectionCircleTexture.texture, nullptr, &cubeRect);
+                if(leftClickPress) { // FIXME: It is at the wrong place, should be in the update function
+                    player.tileX = actualMouseX;
+                    player.tileY = actualMouseY;
+                    leftClickPress = false;
+                    updateTilemapTexture(); // FIXME: I absolutely don't want it to run multiple times per update, I should run it once at the end if necessary
+                }
             }
             
         }
@@ -559,11 +735,13 @@ void MyGame::handleInput(const SDL_Event &event) {
                 switch (event.key.keysym.sym) {
 
                     case SDLK_i:
-                        camera.setZoom(camera.zoom + 0.05);
+                        isZoomingIn = true;
+                        isZoomingOut = false;
                         break;
 
                     case SDLK_o:
-                        camera.setZoom(camera.zoom - 0.05);
+                        isZoomingIn = false;
+                        isZoomingOut = true;
                         break;
 
                     default:
@@ -576,11 +754,37 @@ void MyGame::handleInput(const SDL_Event &event) {
             if (event.key.repeat == 0) {
                 switch (event.key.keysym.sym) {
 
+                case SDLK_i:
+                    isZoomingIn = false;
+                    break;
+
+                case SDLK_o:
+                    isZoomingOut = false;
+                    break;
+
                 default:
                     break;
                 }
             }
             break;
+
+        case SDL_MOUSEBUTTONDOWN:
+            switch(event.button.button) {
+                case SDL_BUTTON_LEFT:
+                        leftClickPress = true;
+                    break;
+                default:
+                    break;
+            }
+
+        case SDL_MOUSEBUTTONUP:
+            switch(event.button.button) {
+                case SDL_BUTTON_LEFT:
+
+                    break;
+                default:
+                    break;
+            }
 
         default:
             break;

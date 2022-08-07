@@ -1,6 +1,6 @@
 /**
- * Implementation file for the TileTexture struct.
- * @file TileTexture.cpp
+ * Implementation file for the SpriteTexture struct.
+ * @file SpriteTexture.cpp
  * @author Maxence
  * @version 1.0
 */
@@ -11,9 +11,9 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
-#include "TileTexture.hpp"
+#include "SpriteTexture.hpp"
 
-TileTexture::TileTexture(SDL_Renderer* renderer, int _width, int _height, std::string texturePath, int alpha) { // 0 <= alpha <= 255
+SpriteTexture::SpriteTexture(SDL_Renderer* renderer, int _width, int _height, std::string texturePath, int alpha) { // 0 <= alpha <= 255
 
     if(_width < 0) {
         throw std::invalid_argument("The width must be greater than 0");
@@ -26,6 +26,7 @@ TileTexture::TileTexture(SDL_Renderer* renderer, int _width, int _height, std::s
 
     const char *cStr = texturePath.c_str();
     texture = IMG_LoadTexture(renderer, cStr);
+    
     SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
     if(texture == nullptr) {
         char buffer[1024]; // The buffer is big enough so that there is no risk of overflow
@@ -36,4 +37,4 @@ TileTexture::TileTexture(SDL_Renderer* renderer, int _width, int _height, std::s
     SDL_SetTextureAlphaMod(texture, alpha); // Must be between 0 and 255
 }
 
-TileTexture::TileTexture() {}
+SpriteTexture::SpriteTexture() {}

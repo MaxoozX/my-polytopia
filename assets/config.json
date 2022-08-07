@@ -8,7 +8,7 @@
         "land": {
             "width": 120,
             "height": 120,
-            "path": "square-cube.png",
+            "path": "cube-détaillé.png",
             "alpha": "1"
         },
         "sand": {
@@ -45,26 +45,50 @@
         },
         "tree": {
             "width": 120,
-            "height": 240,
+            "height": 180,
             "path": "one-tree.png",
             "alpha": "1"
         },
         "forest": {
             "width": 120,
-            "height": 240,
+            "height": 180,
             "path": "forest.png",
             "alpha": "1"
         },
         "sand-forest": {
             "width": 120,
-            "height": 240,
+            "height": 180,
             "path": "sand-forest.png",
+            "alpha": "1"
+        },
+        "volcano": {
+            "width": 120,
+            "height": 180,
+            "path": "volcano.png",
+            "alpha": "1"
+        },
+        "lava-floor": {
+            "width": 120,
+            "height": 120,
+            "path": "lava-floor.png",
             "alpha": "1"
         },
         "undefined": {
             "width": 120,
-            "height": 240,
+            "height": 180,
             "path": "undefined.png",
+            "alpha": "1"
+        },
+        "selection-circle": {
+            "width": 120,
+            "height": 120,
+            "path": "selection-circle.png",
+            "alpha": "0.75"
+        },
+        "character1": {
+            "width": 120,
+            "height": 180,
+            "path": "character1-medium.png",
             "alpha": "1"
         }
     },

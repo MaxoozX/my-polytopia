@@ -10,17 +10,17 @@
 
 #include "Biomes.hpp"
 
-#include "TileTexture.hpp"
+#include "SpriteTexture.hpp"
 
 struct Tile {
 
-    TileTexture* texture;
+    SpriteTexture* texture;
     Biomes biome;
 
-    Tile(TileTexture* _texture, Biomes _biome);
+    Tile(SpriteTexture* _texture, Biomes _biome);
     Tile();
 
-    void setTexturePtr(TileTexture* _texture);
+    void setTexturePtr(SpriteTexture* _texture);
     void setBiome(Biomes _biome);
 
 };

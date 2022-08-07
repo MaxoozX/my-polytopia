@@ -1,6 +1,6 @@
 /**
- * Header file for the TileTexture struct.
- * @file TileTexture.hpp
+ * Header file for the SpriteTexture struct.
+ * @file SpriteTexture.hpp
  * @author Maxence
  * @version 1.0
 */
@@ -13,14 +13,14 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
-struct TileTexture {
+struct SpriteTexture {
 
     int width;
     int height;
     SDL_Texture* texture;
 
-    TileTexture(SDL_Renderer*, int, int, std::string, int = 255);
-    TileTexture();
+    SpriteTexture(SDL_Renderer*, int, int, std::string, int = 255);
+    SpriteTexture();
 
 };
 

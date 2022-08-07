@@ -15,6 +15,8 @@ enum Biomes {
     Tree,
     Forest,
     SandForest,
+    Volcano,
+    LavaFloor,
     Undefined
 };
 

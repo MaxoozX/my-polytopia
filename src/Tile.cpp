@@ -5,14 +5,14 @@
  * @version 1.0
 */
 
-#include "TileTexture.hpp"
+#include "SpriteTexture.hpp"
 #include "Tile.hpp"
 
-Tile::Tile(TileTexture* _texture, Biomes _biome): texture(_texture), biome(_biome) {}
+Tile::Tile(SpriteTexture* _texture, Biomes _biome): texture(_texture), biome(_biome) {}
 
 Tile::Tile() {}
 
-void Tile::setTexturePtr(TileTexture* _texture) {
+void Tile::setTexturePtr(SpriteTexture* _texture) {
     texture = _texture;
 }
 

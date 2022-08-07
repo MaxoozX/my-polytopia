@@ -56,6 +56,10 @@ void Game::mainLoop() {
         timeElapsed = SDL_GetTicks() - lastTime; // In ms
         timeToWait = timePerFrame - timeElapsed;
 
+        if(timeToWait <= 0) {
+            SDL_Log("The game is taking too much ressources (waiting : %d), can't keep up...", timeToWait);
+        }
+
         if (timeToWait > 0) {
             SDL_Delay(timeToWait);
         }

@@ -17,7 +17,8 @@ int main(int argc, char **argv) {
 
     SDL_Init(SDL_INIT_EVERYTHING);
 
-    MyGame myGame(1200, 900, 144, 50);
+    // MyGame myGame(1200, 900, 144, 50);
+    MyGame myGame(1200, 900, 60, 30);
 
     myGame.setup();
 

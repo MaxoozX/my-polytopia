@@ -20,10 +20,11 @@
 #include "Engine/json.hpp"
 
 #include "Tile.hpp"
-#include "TileTexture.hpp"
+#include "SpriteTexture.hpp"
 
 #include "Biomes.hpp"
 #include "Camera.hpp"
+#include "Player.hpp"
 
 class MyGame : public Game {
 
@@ -31,33 +32,54 @@ class MyGame : public Game {
 
         Camera camera;
 
-        TileTexture landTexture;
-        TileTexture sandTexture;
-        TileTexture waterFullTexture;
-        TileTexture waterRightTexture;
-        TileTexture waterLeftTexture;
-        TileTexture waterTopTexture;
-        TileTexture oneTreeTexture;
-        TileTexture forestTexture;
-        TileTexture undefinedTexture;
-        TileTexture sandForestTexture;
+        // The biomes
+        SpriteTexture landTexture;
+        SpriteTexture sandTexture;
+        SpriteTexture waterFullTexture;
+        SpriteTexture waterRightTexture;
+        SpriteTexture waterLeftTexture;
+        SpriteTexture waterTopTexture;
+        SpriteTexture oneTreeTexture;
+        SpriteTexture forestTexture;
+        SpriteTexture undefinedTexture;
+        SpriteTexture sandForestTexture;
+        SpriteTexture volcanoTexture;
+        SpriteTexture lavaFloorTexture;
+
+        // Other gameplay elements' textures
+        SpriteTexture selectionCircleTexture;
+        SpriteTexture playerTexture;
+
+        SDL_Texture *tilemapCurrentTexture;
+
+        Player player; // There may be several players in the future, but I will deal with that later
 
         std::map<Biomes, std::vector< std::pair<Biomes, int> > > generationConstraints;
         std::map<Biomes, int > generationPriorities;
+
+        template<class T>
+        std::map<Biomes, T> getBiomesMapDefaultVal(const T) const;
 
         int gridWidth;
         int gridHeight;
 
         bool showSelectedTile;
+        bool isZoomingIn, isZoomingOut;
+        bool leftClickPress;
         
         std::vector< std::vector< Tile > > grid;
 
         void generateWorld();
         void mapTexturesToBiomes();
-        TileTexture loadTextureFromJson(nlohmann::json, std::string);
+        SpriteTexture loadTextureFromJson(nlohmann::json, std::string);
 
         void display();
+        void updateTilemapTexture();
+
+
         void update();
+        void handleZoom();
+        void handleCameraMovement();
         void handleInput(const SDL_Event&);
 
     public:
